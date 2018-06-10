@@ -37,7 +37,7 @@ include Makefile.inc
 
 VPATH   = src:src/saux:examples
 SOURCES	= sdata.c sdbg.c senc.c sstring.c schar.c ssearch.c ssort.c svector.c \
-	  stree.c smap.c smset.c shash.c scommon.c
+	  stree.c smap.c shmap.c smset.c shash.c scommon.c
 ESOURCES= imgtools.c
 HEADERS	= scommon.h $(SOURCES:.c=.h) examples/*.h
 OBJECTS	= $(SOURCES:.c=.o)
