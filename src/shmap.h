@@ -168,32 +168,32 @@ srt_bool sh_delete_i(srt_hmap *hm, const int64_t k);
 srt_bool sh_delete_s(srt_hmap *hm, const srt_string *k);
 
 /*
- * Enumeration / export data
+ * Enumeration
  */
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_ii32(const srt_hmap *hm, int32_t key_min, int32_t key_max, srt_map_it_ii32 f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_ii32(const srt_hmap *hm, srt_map_it_ii32 f, void *context);
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_uu32(const srt_hmap *hm, uint32_t key_min, uint32_t key_max, srt_map_it_uu32 f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_uu32(const srt_hmap *hm, srt_map_it_uu32 f, void *context);
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_ii(const srt_hmap *hm, int64_t key_min, int64_t key_max, srt_map_it_ii f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_ii(const srt_hmap *hm, srt_map_it_ii f, void *context);
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_is(const srt_hmap *hm, int64_t key_min, int64_t key_max, srt_map_it_is f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_is(const srt_hmap *hm, srt_map_it_is f, void *context);
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_ip(const srt_hmap *hm, int64_t key_min, int64_t key_max, srt_map_it_ip f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_ip(const srt_hmap *hm, srt_map_it_ip f, void *context);
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_si(const srt_hmap *hm, const srt_string *key_min, const srt_string *key_max, srt_map_it_si f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_si(const srt_hmap *hm, srt_map_it_si f, void *context);
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_ss(const srt_hmap *hm, const srt_string *key_min, const srt_string *key_max, srt_map_it_ss f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_ss(const srt_hmap *hm, srt_map_it_ss f, void *context);
 
-/* #API: |Enumerate map elements in a given key range|map; key lower bound; key upper bound; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
-size_t sh_itr_sp(const srt_hmap *hm, const srt_string *key_min, const srt_string *key_max, srt_map_it_sp f, void *context);
+/* #API: |Enumerate hash map elements|map; callback function; callback function context|Elements processed|O(log n) + O(log m); additional 2 * O(log n) space required, allocated on the stack, i.e. fast|0;0| */
+size_t sh_itr_sp(const srt_hmap *hm, srt_map_it_sp f, void *context);
 
 #ifdef __cplusplus
 } /* extern "C" { */
