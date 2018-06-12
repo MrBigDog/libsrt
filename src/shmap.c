@@ -13,17 +13,52 @@
  * Constants and macros
  */
 
-#define SHMAP_BITS 14
-#define SHMAP_BMAPS (1 << SHMAP_BITS)
-#define SHMAP_BMAP_INIT_ELEMS 32
+#define SHM_BITS 14
+#define SHM_BMAPS (1 << SHM_BITS)
+#define SHM_BMAP_INIT_ELEMS 16
 
-#define SHM_FUN(i, CHK, REF, FUN, FPFREF)                                      \
-	if (CHK) {                                                             \
-		for (i = 0; i < SHMAP_BMAPS; i++)                              \
-			FUN(FPFREF->maps[i]);                                  \
+#define SHM_MFUN(i, FUN, REF)                                                  \
+	for (i = 0; i < SHM_BMAPS; i++)                                        \
+		FUN(REF->maps[i]);
+#define SHM_MFUNC(i, CHK, FUN, REF)                                            \
+	if (CHK)                                                               \
+	SHM_MFUN(i, FUN, REF)
+#define SHM_MFUN_PP(i, m, FUN) SHM_MFUNC(i, m &&*m, FUN, &(*m))
+#define SHM_MFUN_P(i, m, FUN) SHM_MFUNC(i, m, FUN, m)
+
+#define SHM_HFi(hf, k, TK) hf((TK)k, SHM_BITS)
+#define SHM_HFs(k) hgen(ss_get_buffer_r(k), ss_get_buffer_size(k), SHM_BITS)
+
+#define SHM_KFx(fn, TR, TM, TK, hfm, mf)                                       \
+	TR fn(TM hm, const TK k)                                               \
+	{                                                                      \
+		size_t smid;                                                   \
+		RETURN_IF(!hm, S_FALSE);                                       \
+		smid = hfm;                                                    \
+		return mf(hm->maps[smid], k);                                  \
 	}
-#define SHM_FUN_PP(i, m, FUN) SHM_FUN(i, m &&*m, *m, FUN, &(*m))
-#define SHM_FUN_P(i, m, FUN) SHM_FUN(i, m, m, FUN, m)
+#define SHM_KFi(fn, TR, TM, TK, hf, mf)                                        \
+	SHM_KFx(fn, TR, TM, TK, SHM_HFi(hf, k, TK), mf)
+#define SHM_KFs(fn, TR, TM, TK, mf) SHM_KFx(fn, TR, TM, TK, SHM_HFs(k), mf)
+
+#define SHM_INSCHK(hm, smid)                                                   \
+	if (!hm->maps[smid]) {                                                 \
+		hm->maps[smid] = sm_alloc(hm->t, SHM_BMAP_INIT_ELEMS);         \
+		if (!hm->maps[smid])                                           \
+			return S_FALSE;                                        \
+	}
+#define SHM_INSFx(fn, TK, TV, hfm, mf)                                         \
+	srt_bool fn(srt_hmap **hm, const TK k, const TV v)                     \
+	{                                                                      \
+		size_t smid;                                                   \
+		RETURN_IF(!hm || !*hm, S_FALSE);                               \
+		smid = hfm;                                                    \
+		SHM_INSCHK((*hm), smid)                                        \
+		return mf(&(*hm)->maps[smid], k, v);                           \
+	}
+#define SHM_INSFi(fn, TK, TV, hf, mf)                                          \
+	SHM_INSFx(fn, TK, TV, SHM_HFi(hf, k, TK), mf)
+#define SHM_INSFs(fn, TK, TV, mf) SHM_INSFx(fn, TK, TV, SHM_HFs(k), mf)
 
 /*
  * Internal functions
@@ -86,12 +121,12 @@ srt_hmap *sh_alloc(const enum eSM_Type t)
 		return NULL;
 	hm->t = t;
 	hm->elems = 0;
-	hm->maps = (srt_map **)malloc(sizeof(srt_map *) * SHMAP_BMAPS);
+	hm->maps = (srt_map **)malloc(sizeof(srt_map *) * SHM_BMAPS);
 	if (!hm->maps) {
 		free(hm);
 		return NULL;
 	}
-	memset(hm->maps, 0, sizeof(srt_map *) * SHMAP_BMAPS);
+	memset(hm->maps, 0, sizeof(srt_map *) * SHM_BMAPS);
 	return hm;
 }
 
@@ -99,7 +134,7 @@ static void sh_free_aux1(srt_hmap **hm)
 {
 	size_t i;
 	if (hm && *hm) {
-		SHM_FUN_PP(i, hm, sm_free);
+		SHM_MFUN_PP(i, hm, sm_free);
 		s_free(*hm);
 		*hm = NULL;
 	}
@@ -121,7 +156,7 @@ void sh_free_aux(srt_hmap **hm, ...)
 void sh_shrink(srt_hmap **hm)
 {
 	size_t i;
-	SHM_FUN_PP(i, hm, sm_shrink);
+	SHM_MFUN_PP(i, hm, sm_shrink);
 }
 
 srt_hmap *sh_dup(const srt_hmap *src)
@@ -130,7 +165,7 @@ srt_hmap *sh_dup(const srt_hmap *src)
 	srt_hmap *o;
 	RETURN_IF(!src, NULL);
 	o = sh_alloc(src->t);
-	for (i = 0; i < SHMAP_BMAPS; i++)
+	for (i = 0; i < SHM_BMAPS; i++)
 		if (src->maps[i])
 			o->maps[i] = sm_dup(src->maps[i]);
 	if (!o->maps[i]) {
@@ -144,12 +179,8 @@ srt_hmap *sh_dup(const srt_hmap *src)
 void sh_clear(srt_hmap *hm)
 {
 	size_t i;
-	SHM_FUN_P(i, hm, sm_clear);
+	SHM_MFUN_P(i, hm, sm_clear);
 }
-
-/*
- * Accessors
- */
 
 size_t sh_size(const srt_hmap *hm)
 {
@@ -161,189 +192,55 @@ srt_bool sh_empty(const srt_hmap *hm)
 	return sh_size(hm) == 0 ? S_TRUE : S_FALSE;
 }
 
-/*
- * Copy
- */
-
 srt_hmap *sh_cpy(srt_hmap **hm, const srt_hmap *src)
 {
-	return NULL; /* TODO/FIXME */
-}
-
-/*
- * Random access
- */
-
-int32_t sh_at_ii32(const srt_hmap *hm, const int32_t k)
-{
-	return 0; /* TODO/FIXME */
-}
-
-uint32_t sh_at_uu32(const srt_hmap *hm, const uint32_t k)
-{
-	return 0; /* TODO/FIXME */
-}
-
-int64_t sh_at_ii(const srt_hmap *hm, const int64_t k)
-{
-	return 0; /* TODO/FIXME */
-}
-
-const srt_string *sh_at_is(const srt_hmap *hm, const int64_t k)
-{
-	return NULL; /* TODO/FIXME */
-}
-
-const void *sh_at_ip(const srt_hmap *hm, const int64_t k)
-{
-	return NULL; /* TODO/FIXME */
-}
-
-int64_t sh_at_si(const srt_hmap *hm, const srt_string *k)
-{
-	return 0; /* TODO/FIXME */
-}
-
-const srt_string *sh_at_ss(const srt_hmap *hm, const srt_string *k)
-{
-	return NULL; /* TODO/FIXME */
-}
-
-const void *sh_at_sp(const srt_hmap *hm, const srt_string *k)
-{
-	return NULL; /* TODO/FIXME */
-}
-
-/*
- * Existence check
- */
-
-srt_bool sh_count_u(const srt_hmap *hm, const uint32_t k)
-{
-	return S_FALSE; /* TODO/FIXME */
-}
-
-srt_bool sh_count_i(const srt_hmap *hm, const int64_t k)
-{
-	return S_FALSE; /* TODO/FIXME */
-}
-
-srt_bool sh_count_s(const srt_hmap *hm, const srt_string *k)
-{
-	return S_FALSE; /* TODO/FIXME */
+	int i;
+	RETURN_IF(!hm, NULL);
+	if (!src) {
+		/* Copy with null source: clear the target */
+		sh_clear(*hm);
+	} else if (!*hm) {
+		/* In case of null target: equivalent to sh_dup() */
+		*hm = sh_dup(src);
+	} else {
+		/* Case of copying over a HM with different type */
+		*hm = sh_alloc(src->t);
+		for (i = 0; i < SHM_BMAPS; i++)
+			if (src->maps[i])
+				sm_cpy(&(*hm)->maps[i], src->maps[i]);
+	}
+	return *hm;
 }
 
 /* clang-format off */
+SHM_KFi(sh_at_ii32, int32_t, const srt_hmap *, int32_t, h32, sm_at_ii32)
+SHM_KFi(sh_at_uu32, uint32_t, const srt_hmap *, uint32_t, h32, sm_at_uu32)
+SHM_KFi(sh_at_ii, int64_t,const srt_hmap *, int64_t, h64, sm_at_ii)
+SHM_KFi(sh_at_is, const srt_string *, const srt_hmap *, int64_t, h64, sm_at_is)
+SHM_KFi(sh_at_ip, const void *, const srt_hmap *, int64_t, h64, sm_at_ip)
+SHM_KFs(sh_at_si, int64_t, const srt_hmap *, srt_string *, sm_at_si)
+SHM_KFs(sh_at_sp, const void *, const srt_hmap *, srt_string *, sm_at_sp)
+SHM_KFs(sh_at_ss, const srt_string *, const srt_hmap *, srt_string *, sm_at_ss)
 
-#define SHMAP_INSCHK(hm, smid)						       \
-	if (!hm->maps[smid]) {						       \
-		hm->maps[smid] = sm_alloc(hm->t, SHMAP_BMAP_INIT_ELEMS);       \
-		if (!hm->maps[smid])					       \
-			return S_FALSE;					       \
-	}
+SHM_KFi(sh_count_u, srt_bool, const srt_hmap *, uint32_t, h32, sm_count_u)
+SHM_KFi(sh_count_i, srt_bool, const srt_hmap *, int64_t, h64, sm_count_i)
+SHM_KFs(sh_count_s, srt_bool, const srt_hmap *, srt_string *, sm_count_s)
 
-/*
- * Insert
- */
+SHM_INSFi(sh_insert_ii32, int32_t, int32_t, h32, sm_insert_ii32)
+SHM_INSFi(sh_insert_uu32, uint32_t, uint32_t, h32, sm_insert_uu32)
+SHM_INSFi(sh_insert_ii, int64_t, int64_t, h64, sm_insert_ii)
+SHM_INSFi(sh_insert_is, int64_t, srt_string *, h64, sm_insert_is)
+SHM_INSFi(sh_insert_ip, int64_t, void *, h64, sm_insert_ip)
+SHM_INSFs(sh_insert_si, srt_string *, int64_t, sm_insert_si)
+SHM_INSFs(sh_insert_ss, srt_string *, srt_string *, sm_insert_ss)
+SHM_INSFs(sh_insert_sp, srt_string *, void *, sm_insert_sp)
 
-#define SHMAP_INSFx(fn, TK, TV, hfm, mf)                                       \
-	srt_bool fn(srt_hmap **hm, const TK k, const TV v)                     \
-	{                                                                      \
-		size_t smid;                                                   \
-		RETURN_IF(!hm || !*hm, S_FALSE);                               \
-		smid = hfm;                                                    \
-		SHMAP_INSCHK((*hm), smid)				       \
-		return mf(&(*hm)->maps[smid], k, v);                           \
-	}
-#define SHMAP_INSFi(fn, TK, TV, hf, mf)                                        \
-	SHMAP_INSFx(fn, TK, TV, hf((TK)k, SHMAP_BITS), mf)
-#define SHMAP_INSFs(fn, TK, TV, mf)                                            \
-	SHMAP_INSFx(                                                           \
-		fn, TK, TV,                                                    \
-		hgen(ss_get_buffer_r(k), ss_get_buffer_size(k), SHMAP_BITS),   \
-		mf)
+SHM_INSFi(sh_inc_ii32, int32_t, int32_t, h32, sm_inc_ii32)
+SHM_INSFi(sh_inc_uu32, uint32_t, uint32_t, h32, sm_inc_uu32)
+SHM_INSFi(sh_inc_ii, int64_t, int64_t, h64, sm_inc_ii)
+SHM_INSFs(sh_inc_si, srt_string *, int64_t, sm_inc_si)
 
-SHMAP_INSFi(sh_insert_ii32, int32_t, int32_t, h32, sm_insert_ii32)
-SHMAP_INSFi(sh_insert_uu32, uint32_t, uint32_t, h32, sm_insert_uu32)
-SHMAP_INSFi(sh_insert_ii, int64_t, int64_t, h64, sm_insert_ii)
-SHMAP_INSFi(sh_insert_is, int64_t, srt_string *, h64, sm_insert_is)
-SHMAP_INSFi(sh_insert_ip, int64_t, void *, h64, sm_insert_ip)
-SHMAP_INSFs(sh_insert_si, srt_string *, int64_t, sm_insert_si)
-SHMAP_INSFs(sh_insert_ss, srt_string *, srt_string *, sm_insert_ss)
-SHMAP_INSFs(sh_insert_sp, srt_string *, void *, sm_insert_sp)
-
-SHMAP_INSFi(sh_inc_ii32, int32_t, int32_t, h32, sm_inc_ii32)
-SHMAP_INSFi(sh_inc_uu32, uint32_t, uint32_t, h32, sm_inc_uu32)
-SHMAP_INSFi(sh_inc_ii, int64_t, int64_t, h64, sm_inc_ii)
-SHMAP_INSFs(sh_inc_si, srt_string *, int64_t, sm_inc_si)
-
-/*
- * Delete
- */
-
-#define SHMAP_DELFx(fn, TK, hfm, mf)                                           \
-	srt_bool fn(srt_hmap *hm, const TK k)                                  \
-	{                                                                      \
-		size_t smid;                                                   \
-		RETURN_IF(!hm, S_FALSE);                                       \
-		smid = hfm;                                                    \
-		if (!hm->maps[smid])                                           \
-			return S_FALSE;                                        \
-		return mf(hm->maps[smid], k);                                  \
-	}
-#define SHMAP_DELFi(fn, TK, hf, mf)                                            \
-	SHMAP_DELFx(fn, TK, hf((TK)k, SHMAP_BITS), mf)
-#define SHMAP_DELFs(fn, TK, mf)                                                \
-	SHMAP_DELFx(                                                           \
-		fn, TK,                                                        \
-		hgen(ss_get_buffer_r(k), ss_get_buffer_size(k), SHMAP_BITS),   \
-		mf)
-
-SHMAP_DELFi(sh_delete_i, int64_t, h64, sm_delete_i)
-SHMAP_DELFs(sh_delete_s, srt_string *, sm_delete_s)
-
-/*
- * Enumeration
- */
-
-size_t sh_itr_ii32(const srt_hmap *hm, srt_map_it_ii32 f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
-
-size_t sh_itr_uu32(const srt_hmap *hm, srt_map_it_uu32 f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
-
-size_t sh_itr_ii(const srt_hmap *hm, srt_map_it_ii f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
-
-size_t sh_itr_is(const srt_hmap *hm, srt_map_it_is f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
-
-size_t sh_itr_ip(const srt_hmap *hm, srt_map_it_ip f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
-
-size_t sh_itr_si(const srt_hmap *hm, srt_map_it_si f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
-
-size_t sh_itr_ss(const srt_hmap *hm, srt_map_it_ss f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
-
-size_t sh_itr_sp(const srt_hmap *hm, srt_map_it_sp f, void *context)
-{
-	return 0; /* TODO/FIXME */
-}
+SHM_KFi(sh_delete_i, srt_bool, srt_hmap *, int64_t, h64, sm_delete_i)
+SHM_KFs(sh_delete_s, srt_bool, srt_hmap *, srt_string *, sm_delete_s)
 
 /* clang-format on */

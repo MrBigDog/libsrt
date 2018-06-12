@@ -233,6 +233,92 @@ bool cxx_map_s64(size_t count, int tid)
 	return true;
 }
 
+bool libsrt_hmap_ii32(size_t count, int tid)
+{
+	RETURN_IF(!TIdTest(tid, TId_Base) && !TIdTest(tid, TId_Read10Times) &&
+		  !TIdTest(tid, TId_DeleteOneByOne), false);
+	srt_hmap *m = sh_alloc(SM_II32);
+	for (size_t i = 0; i < count; i++)
+		sh_insert_ii32(&m, (int32_t)i, (int32_t)i);
+	for (size_t j = 0; j < TId2Count(tid); j++)
+		for (size_t i = 0; i < count; i++)
+			(void)sh_at_ii32(m, (int32_t)i);
+	if (TIdTest(tid, TId_DeleteOneByOne))
+		for (size_t i = 0; i < count; i++)
+			sh_delete_i(m, (int32_t)i);
+	HOLD_EXEC(tid);
+	sh_free(&m);
+	return true;
+}
+
+bool libsrt_hmap_ii64(size_t count, int tid)
+{
+	RETURN_IF(!TIdTest(tid, TId_Base) && !TIdTest(tid, TId_Read10Times) &&
+		  !TIdTest(tid, TId_DeleteOneByOne), false);
+	srt_hmap *m = sh_alloc(SM_II);
+	for (size_t i = 0; i < count; i++)
+		sh_insert_ii(&m, (int64_t)i, (int64_t)i);
+	for (size_t j = 0; j < TId2Count(tid); j++)
+		for (size_t i = 0; i < count; i++)
+			(void)sh_at_ii(m, (int64_t)i);
+	if (TIdTest(tid, TId_DeleteOneByOne))
+		for (size_t i = 0; i < count; i++)
+			sh_delete_i(m, (int64_t)i);
+	HOLD_EXEC(tid);
+	sh_free(&m);
+	return true;
+}
+
+bool libsrt_hmap_s16(size_t count, int tid)
+{
+	RETURN_IF(!TIdTest(tid, TId_Base) && !TIdTest(tid, TId_Read10Times) &&
+		  !TIdTest(tid, TId_DeleteOneByOne), false);
+	srt_string *btmp = ss_alloca(512);
+	srt_hmap *m = sh_alloc(SM_SS);
+	for (size_t i = 0; i < count; i++) {
+		ss_printf(&btmp, 512, "%016i", (int)i);
+		sh_insert_ss(&m, btmp, btmp);
+	}
+	for (size_t j = 0; j < TId2Count(tid); j++)
+		for (size_t i = 0; i < count; i++) {
+			ss_printf(&btmp, 512, "%016i", (int)i);
+			(void)sh_at_ss(m, btmp);
+		}
+	if (TIdTest(tid, TId_DeleteOneByOne))
+		for (size_t i = 0; i < count; i++) {
+			ss_printf(&btmp, 512, "%016i", (int)i);
+			sh_delete_s(m, btmp);
+		}
+	HOLD_EXEC(tid);
+	sh_free(&m);
+	return true;
+}
+
+bool libsrt_hmap_s64(size_t count, int tid)
+{
+	RETURN_IF(!TIdTest(tid, TId_Base) && !TIdTest(tid, TId_Read10Times) &&
+		  !TIdTest(tid, TId_DeleteOneByOne), false);
+	srt_string *btmp = ss_alloca(512);
+	srt_hmap *m = sh_alloc(SM_SS);
+	for (size_t i = 0; i < count; i++) {
+		ss_printf(&btmp, 512, "%064i", (int)i);
+		sh_insert_ss(&m, btmp, btmp);
+	}
+	for (size_t j = 0; j < TId2Count(tid); j++)
+		for (size_t i = 0; i < count; i++) {
+			ss_printf(&btmp, 512, "%064i", (int)i);
+			(void)sh_at_ss(m, btmp);
+		}
+	if (TIdTest(tid, TId_DeleteOneByOne))
+		for (size_t i = 0; i < count; i++) {
+			ss_printf(&btmp, 512, "%064i", (int)i);
+			sh_delete_s(m, btmp);
+		}
+	HOLD_EXEC(tid);
+	sh_free(&m);
+	return true;
+}
+
 #if __cplusplus >= 201103L
 
 bool cxx_umap_ii32(size_t count, int tid)
@@ -1221,21 +1307,25 @@ int main(int argc, char *argv[])
 		printf("\n%s\n| Test | Insert count | Memory (MiB) | Execution "
 		       "time (s) |\n|:---:|:---:|:---:|:---:|\n", label[i]);
 		BENCH_FN(libsrt_map_ii32, count[i], tid[i]);
+		BENCH_FN(libsrt_hmap_ii32, count[i], tid[i]);
 		BENCH_FN(cxx_map_ii32, count[i], tid[i]);
 #if __cplusplus >= 201103L
 		BENCH_FN(cxx_umap_ii32, count[i], tid[i]);
 #endif
 		BENCH_FN(libsrt_map_ii64, count[i], tid[i]);
+		BENCH_FN(libsrt_hmap_ii64, count[i], tid[i]);
 		BENCH_FN(cxx_map_ii64, count[i], tid[i]);
 #if __cplusplus >= 201103L
 		BENCH_FN(cxx_umap_ii64, count[i], tid[i]);
 #endif
 		BENCH_FN(libsrt_map_s16, count[i], tid[i]);
+		BENCH_FN(libsrt_hmap_s16, count[i], tid[i]);
 		BENCH_FN(cxx_map_s16, count[i], tid[i]);
 #if __cplusplus >= 201103L
 		BENCH_FN(cxx_umap_s16, count[i], tid[i]);
 #endif
 		BENCH_FN(libsrt_map_s64, count[i], tid[i]);
+		BENCH_FN(libsrt_hmap_s64, count[i], tid[i]);
 		BENCH_FN(cxx_map_s64, count[i], tid[i]);
 #if __cplusplus >= 201103L
 		BENCH_FN(cxx_umap_s64, count[i], tid[i]);
