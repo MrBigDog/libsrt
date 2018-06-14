@@ -33,6 +33,7 @@ struct S_HMap
 {
 	enum eSM_Type t;
 	size_t elems;
+	size_t nmaps;
 	srt_map **maps;
 };
 

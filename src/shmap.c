@@ -13,21 +13,21 @@
  * Constants and macros
  */
 
-#define SHM_BITS 14
-#define SHM_BMAPS (1 << SHM_BITS)
-#define SHM_BMAP_INIT_ELEMS 16
+#define SHM_BITS_I 16
+#define SHM_BITS_S 15
+#define SHM_BMAP_INIT_ELEMS 12
 
-#define SHM_MFUN(i, FUN, REF)                                                  \
-	for (i = 0; i < SHM_BMAPS; i++)                                        \
+#define SHM_MFUN(i, FUN, NM, REF)                                              \
+	for (i = 0; i < NM; i++)					       \
 		FUN(REF->maps[i]);
-#define SHM_MFUNC(i, CHK, FUN, REF)                                            \
+#define SHM_MFUNC(i, CHK, FUN, NM, REF)                                        \
 	if (CHK)                                                               \
-	SHM_MFUN(i, FUN, REF)
-#define SHM_MFUN_PP(i, m, FUN) SHM_MFUNC(i, m &&*m, FUN, &(*m))
-#define SHM_MFUN_P(i, m, FUN) SHM_MFUNC(i, m, FUN, m)
+	SHM_MFUN(i, FUN, NM, REF)
+#define SHM_MFUN_PP(i, m, FUN) SHM_MFUNC(i, m && *m, FUN, (*m)->nmaps, &(*m))
+#define SHM_MFUN_P(i, m, FUN) SHM_MFUNC(i, m, FUN, m->nmaps, m)
 
-#define SHM_HFi(hf, k, TK) hf((TK)k, SHM_BITS)
-#define SHM_HFs(k) hgen(ss_get_buffer_r(k), ss_get_buffer_size(k), SHM_BITS)
+#define SHM_HFi(hf, k, TK) hf((TK)k, SHM_BITS_I)
+#define SHM_HFs(k) hgen(ss_get_buffer_r(k), ss_get_buffer_size(k), SHM_BITS_S)
 
 #define SHM_KFx(fn, TR, TM, TK, hfm, mf)                                       \
 	TR fn(TM hm, const TK k)                                               \
@@ -43,7 +43,8 @@
 
 #define SHM_INSCHK(hm, smid)                                                   \
 	if (!hm->maps[smid]) {                                                 \
-		hm->maps[smid] = sm_alloc(hm->t, SHM_BMAP_INIT_ELEMS);         \
+		hm->maps[smid] = sm_alloc(hm->t,			       \
+					  SHM_BMAP_INIT_ELEMS + (smid % 4));   \
 		if (!hm->maps[smid])                                           \
 			return S_FALSE;                                        \
 	}
@@ -64,13 +65,14 @@
  * Internal functions
  */
 
-S_INLINE uint64_t h64_step(uint64_t in, size_t hbits)
+S_INLINE uint32_t h64(uint64_t in, size_t hbits)
 {
 	size_t i;
-	uint64_t out;
+	uint32_t out;
+	const uint32_t hmask = (1 << hbits) - 1;
 	for (i = 0, out = 0; i < 64; i += hbits)
 		out += (in >> i);
-	return out + (in >> i);
+	return out & hmask;
 }
 
 S_INLINE uint32_t h32(uint32_t in, size_t hbits)
@@ -80,13 +82,7 @@ S_INLINE uint32_t h32(uint32_t in, size_t hbits)
 	const uint32_t hmask = (1 << hbits) - 1;
 	for (i = 0, out = 0; i < 32; i += hbits)
 		out += (in >> i);
-	return (out + (in >> i)) & hmask;
-}
-
-S_INLINE uint32_t h64(uint64_t in, size_t hbits)
-{
-	const uint32_t hmask = (1 << hbits) - 1;
-	return (uint32_t)h64_step(in, hbits) & hmask;
+	return out & hmask;
 }
 
 S_INLINE uint32_t hgen(const void *in0, size_t in_size, size_t hbits)
@@ -99,14 +95,14 @@ S_INLINE uint32_t hgen(const void *in0, size_t in_size, size_t hbits)
 	in_size_c8 = (in_size / sizeof(aux)) * sizeof(aux);
 	for (i = 0, acc = 0; i < in_size_c8; i += sizeof(aux)) {
 		memcpy(&aux, in + i, sizeof(aux));
-		acc ^= h64_step(aux, hbits);
+		acc ^= aux;
 	}
 	if (in_size_c8 < in_size) {
 		memset(&aux, 0, sizeof(aux));
 		memcpy(&aux, in + i, in_size - in_size_c8);
-		acc ^= h64_step(aux, hbits);
+		acc ^= aux;
 	}
-	return (uint32_t)(acc & hmask);
+	return h64(acc, hbits);
 }
 
 /*
@@ -121,12 +117,14 @@ srt_hmap *sh_alloc(const enum eSM_Type t)
 		return NULL;
 	hm->t = t;
 	hm->elems = 0;
-	hm->maps = (srt_map **)malloc(sizeof(srt_map *) * SHM_BMAPS);
+	hm->nmaps = 1 << (t == SM_SI || t == SM_SS || t == SM_SP ?
+			  SHM_BITS_S : SHM_BITS_I);
+	hm->maps = (srt_map **)malloc(sizeof(srt_map *) * hm->nmaps);
 	if (!hm->maps) {
 		free(hm);
 		return NULL;
 	}
-	memset(hm->maps, 0, sizeof(srt_map *) * SHM_BMAPS);
+	memset(hm->maps, 0, sizeof(srt_map *) * hm->nmaps);
 	return hm;
 }
 
@@ -165,7 +163,7 @@ srt_hmap *sh_dup(const srt_hmap *src)
 	srt_hmap *o;
 	RETURN_IF(!src, NULL);
 	o = sh_alloc(src->t);
-	for (i = 0; i < SHM_BMAPS; i++)
+	for (i = 0; i < src->nmaps; i++)
 		if (src->maps[i])
 			o->maps[i] = sm_dup(src->maps[i]);
 	if (!o->maps[i]) {
@@ -173,6 +171,7 @@ srt_hmap *sh_dup(const srt_hmap *src)
 		return NULL;
 	}
 	o->elems = src->elems;
+	o->nmaps = src->nmaps;
 	return o;
 }
 
@@ -205,7 +204,7 @@ srt_hmap *sh_cpy(srt_hmap **hm, const srt_hmap *src)
 	} else {
 		/* Case of copying over a HM with different type */
 		*hm = sh_alloc(src->t);
-		for (i = 0; i < SHM_BMAPS; i++)
+		for (i = 0; i < (*hm)->nmaps; i++)
 			if (src->maps[i])
 				sm_cpy(&(*hm)->maps[i], src->maps[i]);
 	}
